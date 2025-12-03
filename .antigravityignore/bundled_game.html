@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperChess (Alpha)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #6c5ce7;
+            --accent-hover: #5b4cc4;
+            --board-light: #eeeed2;
+            --board-dark: #769656;
+            --highlight-move: rgba(108, 92, 231, 0.5);
+            --highlight-capture: rgba(231, 76, 60, 0.6);
+            --highlight-selected: rgba(255, 234, 167, 0.6);
+            --font-main: 'Inter', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 1200px;
+            height: 95vh;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        /* Header */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .game-header h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--accent-color);
+        }
+
+        .version {
+            font-size: 0.8rem;
+            color: #888;
+            font-weight: 400;
+            margin-left: 0.5rem;
+        }
+
+        .game-info {
+            display: flex;
+            gap: 1.5rem;
+            font-weight: 600;
+        }
+
+        /* Main Game Area */
+        .game-area {
+            display: flex;
+            gap: 2rem;
+            flex: 1;
+            min-height: 0;
+            /* For flex child scrolling */
+        }
+
+        .board-container {
+            flex: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #2d2d2d;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .chess-board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: min(80vh, 100%);
+            aspect-ratio: 1 / 1;
+            border: 4px solid #333;
+            user-select: none;
+        }
+
+        .square {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            /* Piece icon size */
+            cursor: pointer;
+            position: relative;
+        }
+
+        .square.light {
+            background-color: var(--board-light);
+            color: black;
+        }
+
+        .square.dark {
+            background-color: var(--board-dark);
+            color: black;
+        }
+
+        .square.selected {
+            background-color: var(--highlight-selected) !important;
+        }
+
+        .square.valid-move::after {
+            content: '';
+            position: absolute;
+            width: 35%;
+            height: 35%;
+            background-color: rgba(108, 92, 231, 0.8);
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(108, 92, 231, 0.6);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+        }
+
+        .square.valid-capture {
+            background-color: var(--highlight-capture) !important;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .piece {
+            width: 100%;
+            height: 100%;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            transition: transform 0.2s ease;
+        }
+
+        .piece:hover {
+            transform: scale(1.1);
+        }
+
+        /* Side Panel */
+        .side-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            min-width: 300px;
+        }
+
+        .panel-section {
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .panel-section h2 {
+            font-size: 1.1rem;
+            margin-bottom: 0.8rem;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 0.3rem;
+            display: inline-block;
+        }
+
+        .stats-section {
+            flex: 1;
+        }
+
+        .log-section {
+            flex: 1.5;
+            min-height: 0;
+        }
+
+        .log-box {
+            flex: 1;
+            overflow-y: auto;
+            background-color: #121212;
+            border-radius: 4px;
+            padding: 0.5rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            border: 1px solid #333;
+        }
+
+        .log-entry {
+            margin-bottom: 0.4rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid #222;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        /* Modal */
+        .hidden {
+            display: none !important;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: var(--panel-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid var(--accent-color);
+            box-shadow: 0 0 30px rgba(108, 92, 231, 0.3);
+        }
+
+        .modal-content h2 {
+            color: var(--accent-color);
+            margin-bottom: 1rem;
+        }
+
+        #modal-close-btn {
+            margin-top: 1.5rem;
+            padding: 0.5rem 1.5rem;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        #modal-close-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        /* Skill Card Styles */
+        .skills-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .skill-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .skill-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.2);
+            border-color: var(--accent-color);
+        }
+
+        .skill-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--accent-color);
+        }
+
+        .skill-card p {
+            background: #ffd700;
+            /* Gold for skill moves */
+            box-shadow: 0 0 8px #ffd700;
+        }
+
+        .log-entry.skill {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .log-entry.level-up {
+            color: #4ade80;
+            /* Green for level up */
+            font-weight: bold;
+        }
+
+        .log-entry.white {
+            background-color: rgba(74, 144, 226, 0.15);
+            border-left: 4px solid #4a90e2;
+            padding-left: 0.5rem;
+        }
+
+        .log-entry.black {
+            background-color: rgba(231, 76, 60, 0.15);
+            border-left: 4px solid #e74c3c;
+            padding-left: 0.5rem;
+        }
+
+        .history-highlight::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 215, 0, 0.3);
+            pointer-events: none;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .game-area {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .board-container {
+                padding: 0.5rem;
+            }
+
+            .chess-board {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .side-panel {
+                min-width: 0;
+                height: auto;
+            }
+
+            .log-section {
+                max-height: 200px;
+            }
+
+            .square {
+                font-size: 1.8rem;
+                /* Smaller pieces on mobile */
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="game-header">
+            <h1>SuperChess <span class="version">Alpha</span></h1>
+            <div class="game-info">
+                <span id="turn-indicator">プレイヤーのターン</span>
+                <span id="phase-indicator">フェーズ: 配置</span>
+            </div>
+        </header>
+
+        <main class="game-area">
+            <div class="board-container">
+                <div id="board" class="chess-board">
+                    <!-- Board squares will be generated by JS -->
+                </div>
+            </div>
+
+            <aside class="side-panel">
+                <div class="panel-section stats-section">
+                    <h2>選択中のコマ</h2>
+                    <div id="piece-details" class="details-box">
+                        <p class="placeholder-text">コマを選択して詳細を表示</p>
+                    </div>
+                </div>
+
+                <div class="panel-section log-section">
+                    <h2>バトルログ</h2>
+                    <div id="game-log" class="log-box">
+                        <div class="log-entry">ゲーム開始</div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Start Screen Overlay -->
+    <div id="start-screen" class="modal-overlay">
+        <div class="modal-content start-menu">
+            <h2>SuperChess</h2>
+            <p>モードを選択してください</p>
+
+            <div class="mode-selection">
+                <button id="btn-pvp" class="menu-btn selected">VS Player</button>
+                <button id="btn-pvc" class="menu-btn">VS CPU</button>
+            </div>
+
+            <div id="difficulty-select" class="difficulty-selection hidden">
+                <label for="difficulty">難易度:</label>
+                <select id="difficulty">
+                    <option value="easy">Easy (ランダム)</option>
+                    <option value="normal" selected>Normal (攻撃的)</option>
+                    <option value="hard">Hard (探索)</option>
+                </select>
+            </div>
+
+
+        </div>
+    </div>
+    </div>
+
+    <script>
+        // --- SkillSystem.js ---
+        const SkillType = {
+            MOVEMENT: 'movement', // Changes how piece moves
+            ACTION: 'action', // Changes what piece does (capture, etc)
+            PASSIVE: 'passive' // Stat boosts or passive effects
+        };
+
+        class SkillSystem {
+            constructor() {
+                this.xpTable = {
+                    1: 100,
+                    2: 300,
+                    3: 600,
+                    4: 1000,
+                    5: 1500
+                };
+
+                this.skillPool = [
+                    {
+                        id: 'diagonal_move', name: '斜め移動', description: '斜め方向に1マス移動できる。', type: SkillType.MOVEMENT, target:
+                            ['pawn']
+                    },
+                    {
+                        id: 'double_step', name: '2歩移動', description: '前方に2マス移動できる。', type: SkillType.MOVEMENT, target: ['pawn',
+                            'king']
+                    },
+                    {
+                        id: 'pierce', name: '貫通', description: '攻撃が敵を1体貫通する。', type: SkillType.ACTION, target: ['rook', 'bishop',
+                            'queen']
+                    },
+                    {
+                        id: 'regeneration', name: '自動回復', description: 'ターン毎に10XP回復する。', type: SkillType.PASSIVE, target: ['all']
+                    },
+                    { id: 'berserk', name: 'バーサーク', description: '敵撃破時の獲得XPが2倍になる。', type: SkillType.PASSIVE, target: ['all'] },
+                    {
+                        id: 'knight_jump', name: 'ナイトジャンプ', description: 'ナイトのように駒を飛び越えられる。', type: SkillType.MOVEMENT, target:
+                            ['rook', 'bishop']
+                    }
+                ];
+            }
+
+            getNextLevelXp(currentLevel) {
+                return this.xpTable[currentLevel] || 9999;
+            }
+
+            checkLevelUp(piece) {
+                const nextXp = this.getNextLevelXp(piece.level);
+                return piece.xp >= nextXp;
+            }
+
+            getRandomSkills(piece, count = 3) {
+                // Filter skills suitable for this piece type
+                const suitableSkills = this.skillPool.filter(skill =>
+                    (skill.target.includes('all') || skill.target.includes(piece.type)) &&
+                    !piece.skills.some(s => s.id === skill.id) // Don't offer already owned skills
+                );
+
+                // Shuffle and pick
+                const shuffled = suitableSkills.sort(() => 0.5 - Math.random());
+                return shuffled.slice(0, count);
+            }
+
+            applySkill(piece, skill) {
+                piece.skills.push(skill);
+                // Level up logic
+                piece.xp -= this.getNextLevelXp(piece.level);
+                piece.level++;
+                console.log(`${piece.getName()} leveled up to ${piece.level} and learned ${skill.name}!`);
+            }
+        }
+
+        const skillSystem = new SkillSystem();
+
+        // --- Piece.js ---
+        const PieceType = {
+            PAWN: 'pawn',
+            ROOK: 'rook',
+            KNIGHT: 'knight',
+            BISHOP: 'bishop',
+            QUEEN: 'queen',
+            KING: 'king'
+        };
+
+        const PieceColor = {
+            WHITE: 'white',
+            BLACK: 'black'
+        };
+
+        class Piece {
+            constructor(type, color) {
+                this.type = type;
+                this.color = color;
+                this.hasMoved = false;
+                this.id = crypto.randomUUID(); // Unique ID for tracking stats
+
+                // RPG Stats (Phase 2)
+                this.level = 1;
+                this.xp = 0;
+                this.skills = [];
+            }
+
+            addXp(amount) {
+                this.xp += amount;
+                return skillSystem.checkLevelUp(this);
+            }
+
+            getSymbol() {
+                return '?';
+            }
+
+            getName() {
+                return '不明なコマ';
+            }
+        }
+
+        class Pawn extends Piece {
+            constructor(color) {
+                super(PieceType.PAWN, color);
+            }
+            getSymbol() { return this.color === PieceColor.WHITE ? '♙' : '♟'; }
+            getName() { return 'ポーン'; }
+        }
+
+        class Rook extends Piece {
+            constructor(color) {
+                super(PieceType.ROOK, color);
+            }
+            getSymbol() { return this.color === PieceColor.WHITE ? '♖' : '♜'; }
+            getName() { return 'ルーク'; }
+        }
+
+        class Knight extends Piece {
+            constructor(color) {
+                super(PieceType.KNIGHT, color);
+            }
+            getSymbol() { return this.color === PieceColor.WHITE ? '♘' : '♞'; }
+            getName() { return 'ナイト'; }
+        }
+
+        class Bishop extends Piece {
+            constructor(color) {
+                super(PieceType.BISHOP, color);
+            }
+            getSymbol() { return this.color === PieceColor.WHITE ? '♗' : '♝'; }
+            getName() { return 'ビショップ'; }
+        }
+
+        this.grid = Array(this.rows).fill(null).map(() => Array(this.cols).fill(null));
+        this.setupPieces();
+        }
+
+        setupPieces() {
+            this.setupRow(0, PieceColor.BLACK, [Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook]);
+            this.setupPawns(1, PieceColor.BLACK);
+            this.setupPawns(6, PieceColor.WHITE);
+            this.setupRow(7, PieceColor.WHITE, [Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook]);
+        }
+
+        setupRow(row, color, pieceClasses) {
+            pieceClasses.forEach((PieceClass, col) => {
+                this.grid[row][col] = new PieceClass(color);
+            });
+        }
+
+        setupPawns(row, color) {
+            for (let col = 0; col < this.cols; col++) { this.grid[row][col] = new Pawn(color); }
+        } getPiece(row, col) {
+            if
+                (this.isValidPosition(row, col)) return this.grid[row][col]; return null;
+        } setPiece(row, col, piece) {
+            if (this.isValidPosition(row, col)) this.grid[row][col] = piece;
+        } movePiece(fromRow, fromCol, toRow,
+            toCol) {
+            const piece = this.getPiece(fromRow, fromCol); const target = this.getPiece(toRow, toCol); if
+                (piece) {
+                this.grid[toRow][toCol] = piece; this.grid[fromRow][fromCol] = null; piece.hasMoved = true; return
+                target;
+            } return null;
+        } isValidPosition(row, col) { return row >= 0 && row < 8 && col >= 0 && col < 8; }
+                        } // --- Rules.js --- class Rules { static getValidMoves(board, piece, row, col, lastMove=null)
+        {
+            const moves = []; switch (piece.type) {
+                case PieceType.PAWN:
+                    moves.push(...this.getPawnMoves(board, piece, row, col, lastMove)); break; case PieceType.ROOK:
+                    moves.push(...this.getSlidingMoves(board, piece, row, col, [[1, 0], [-1, 0], [0, 1], [0, -1]]));
+                    break; case PieceType.KNIGHT: moves.push(...this.getKnightMoves(board, piece, row, col)); break;
+                case PieceType.BISHOP: moves.push(...this.getSlidingMoves(board, piece, row, col, [[1, 1], [1,
+                    -1], [-1, 1], [-1, -1]])); break; case PieceType.QUEEN:
+                    moves.push(...this.getSlidingMoves(board, piece, row, col, [[1, 0], [-1, 0], [0, 1], [0, -1],
+                    [1, 1], [1, -1], [-1, 1], [-1, -1]])); break; case PieceType.KING:
+                    moves.push(...this.getKingMoves(board, piece, row, col)); break;
+            } return moves;
+        } static
+        hasSkill(piece, skillId) {
+            return piece.skills.some(s => s.id === skillId);
+        }
+
+                        static getPawnMoves(board, piece, row, col, lastMove) {
+            const moves = [];
+            const direction = piece.color === PieceColor.WHITE ? -1 : 1;
+            const startRow = piece.color === PieceColor.WHITE ? 6 : 1;
+
+            // Forward 1
+            if (board.isValidPosition(row + direction, col) && !board.getPiece(row + direction, col)) {
+                moves.push({ row: row + direction, col: col, type: 'normal' });
+
+                // Forward 2
+                if (row === startRow && !board.getPiece(row + direction * 2, col)) {
+                    moves.push({ row: row + direction * 2, col: col, type: 'normal' });
+                } else if (this.hasSkill(piece, 'double_step') && !board.getPiece(row + direction * 2, col)) {
+                    moves.push({ row: row + direction * 2, col: col, type: 'skill' });
+                }
+            }
+
+            // Captures
+            [[direction, -1], [direction, 1]].forEach(offset => {
+                const targetRow = row + offset[0];
+                const targetCol = col + offset[1];
+                if (board.isValidPosition(targetRow, targetCol)) {
+                    const targetPiece = board.getPiece(targetRow, targetCol);
+                    if (targetPiece && targetPiece.color !== piece.color) {
+                        moves.push({ row: targetRow, col: targetCol, type: 'capture' });
+                    }
+                }
+            });
+
+            // En Passant
+            if (lastMove && lastMove.piece.type === PieceType.PAWN && Math.abs(lastMove.from.row -
+                lastMove.to.row) === 2) {
+                if (lastMove.to.row === row && Math.abs(lastMove.to.col - col) === 1) {
+                    moves.push({ row: row + direction, col: lastMove.to.col, type: 'en_passant' });
+                }
+            }
+
+            // Skill: Diagonal Move
+            if (this.hasSkill(piece, 'diagonal_move')) {
+                [[direction, -1], [direction, 1]].forEach(offset => {
+                    const targetRow = row + offset[0];
+                    const targetCol = col + offset[1];
+                    if (board.isValidPosition(targetRow, targetCol) && !board.getPiece(targetRow, targetCol)) {
+                        moves.push({ row: targetRow, col: targetCol, type: 'skill' });
+                    }
+                });
+            }
+
+            return moves;
+        }
+
+                        static getSlidingMoves(board, piece, row, col, directions) {
+            const moves = [];
+            directions.forEach(dir => {
+                let r = row + dir[0];
+                let c = col + dir[1];
+                while (board.isValidPosition(r, c)) {
+                    const target = board.getPiece(r, c);
+                    if (!target) {
+                        moves.push({ row: r, col: c, type: 'normal' });
+                    } else {
+                        if (target.color !== piece.color) {
+                            moves.push({ row: r, col: c, type: 'capture' });
+                            // Skill: Pierce
+                            if (this.hasSkill(piece, 'pierce')) {
+                                // Check one more step behind
+                                let pr = r + dir[0];
+                                let pc = c + dir[1];
+                                if (board.isValidPosition(pr, pc)) {
+                                    const pTarget = board.getPiece(pr, pc);
+                                    if (!pTarget || pTarget.color !== piece.color) {
+                                        moves.push({ row: pr, col: pc, type: 'skill' });
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    r += dir[0];
+                    c += dir[1];
+                }
+            });
+            // Skill: Knight Jump (for Rook/Bishop)
+            if (this.hasSkill(piece, 'knight_jump')) {
+                moves.push(...this.getKnightMoves(board, piece, row, col, true));
+            }
+            return moves;
+        }
+
+                        static getKnightMoves(board, piece, row, col, isSkill = false) {
+            const moves = [];
+            const offsets = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]];
+            offsets.forEach(offset => {
+                const r = row + offset[0];
+                const c = col + offset[1];
+                if (board.isValidPosition(r, c)) {
+                    const target = board.getPiece(r, c);
+                    if (!target || target.color !== piece.color) {
+                        moves.push({ row: r, col: c, type: isSkill ? 'skill' : (target ? 'capture' : 'normal') });
+                    }
+                }
+            });
+            return moves;
+        }
+
+                        static getKingMoves(board, piece, row, col) {
+            const moves = [];
+            const offsets = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+            offsets.forEach(offset => {
+                const r = row + offset[0];
+                const c = col + offset[1];
+                if (board.isValidPosition(r, c)) {
+                    const target = board.getPiece(r, c);
+                    if (!target || target.color !== piece.color) {
+                        moves.push({ row: r, col: c, type: target ? 'capture' : 'normal' });
+                    }
+                }
+            });
+
+            // Skill: Double Step (King)
+            if (this.hasSkill(piece, 'double_step')) {
+                // Logic for King double step if needed, but usually Pawn skill
+            }
+
+            // Castling
+            if (!piece.hasMoved) {
+                // Kingside
+                const rookK = board.getPiece(row, 7);
+                if (rookK && rookK.type === PieceType.ROOK && !rookK.hasMoved) {
+                    if (!board.getPiece(row, 5) && !board.getPiece(row, 6)) {
+                        moves.push({ row: row, col: 6, type: 'castling_king' });
+                    }
+                }
+                // Queenside
+                const rookQ = board.getPiece(row, 0);
+                if (rookQ && rookQ.type === PieceType.ROOK && !rookQ.hasMoved) {
+                    if (!board.getPiece(row, 1) && !board.getPiece(row, 2) && !board.getPiece(row, 3)) {
+                        moves.push({ row: row, col: 2, type: 'castling_queen' });
+                    }
+                }
+            }
+
+            return moves;
+        }
+                        }
+
+        // --- AI.js ---
+        class AI {
+            static getBestMove(board, color, difficulty, lastMove) {
+                const allMoves = this.getAllMoves(board, color, lastMove);
+                if (allMoves.length === 0) return null;
+
+                if (difficulty === 'easy') {
+                    return this.getRandomMove(allMoves);
+                } else if (difficulty === 'normal') {
+                    return this.getGreedyMove(board, allMoves);
+                } else {
+                    return this.getSmartMove(board, allMoves, color);
+                }
+            }
+
+            static getAllMoves(board, color, lastMove) {
+                const moves = [];
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = board.getPiece(r, c); if
+                            (piece && piece.color === color) {
+                            const validMoves = Rules.getValidMoves(board, piece, r, c,
+                                lastMove); validMoves.forEach(m => {
+                                    moves.push({
+                                        from: { row: r, col: c },
+                                        to: m,
+                                        piece: piece,
+                                        type: m.type
+                                    });
+                                });
+                        }
+                    }
+                }
+                return moves;
+            }
+
+            static getRandomMove(moves) {
+                const randomIndex = Math.floor(Math.random() * moves.length);
+                return moves[randomIndex];
+            }
+
+            static getGreedyMove(board, moves) {
+                const captureMoves = moves.filter(m => {
+                    const target = board.getPiece(m.to.row, m.to.col);
+                    return target && target.color !== m.piece.color;
+                });
+
+                if (captureMoves.length > 0) {
+                    captureMoves.sort((a, b) => {
+                        const targetA = board.getPiece(a.to.row, a.to.col);
+                        const targetB = board.getPiece(b.to.row, b.to.col);
+                        return this.getPieceValue(targetB) - this.getPieceValue(targetA);
+                    });
+                    return captureMoves[0];
+                }
+
+                return this.getRandomMove(moves);
+            }
+
+            static getSmartMove(board, moves, color) {
+                let bestScore = -Infinity;
+                let bestMove = null;
+                moves.sort(() => Math.random() - 0.5);
+
+                for (const move of moves) {
+                    const targetPiece = board.getPiece(move.to.row, move.to.col);
+                    if (targetPiece && targetPiece.type === PieceType.KING) {
+                        return move;
+                    }
+
+                    let score = 0;
+                    if (targetPiece) {
+                        score += this.getPieceValue(targetPiece) * 10;
+                    }
+
+                    if (move.to.row >= 3 && move.to.row <= 4 && move.to.col >= 3 && move.to.col <= 4) {
+                        score
+                            += 2;
+                    } if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = move;
+                    }
+                }
+
+                return bestMove || this.getRandomMove(moves);
+            }
+
+            static getPieceValue(piece) {
+                if (!piece) return 0;
+                switch (piece.type) {
+                    case PieceType.PAWN: return 1;
+                    case PieceType.KNIGHT: return 3;
+                    case PieceType.BISHOP: return 3;
+                    case PieceType.ROOK: return 5;
+                    case PieceType.QUEEN: return 9;
+                    case PieceType.KING: return 1000;
+                    default: return 0;
+                }
+            }
+        }
+
+        // --- UI.js ---
+        class UI {
+            constructor() {
+                this.boardElement = document.getElementById('board');
+                this.logElement = document.getElementById('game-log');
+                this.turnIndicator = document.getElementById('turn-indicator');
+                this.pieceDetailsElement = document.getElementById('piece-details');
+
+                this.modalOverlay = document.getElementById('modal-overlay');
+                this.modalTitle = document.getElementById('modal-title');
+                this.modalBody = document.getElementById('modal-body');
+                this.modalCloseBtn = document.getElementById('modal-close-btn');
+
+                this.startScreen = document.getElementById('start-screen');
+                this.pvpBtn = document.getElementById('btn-pvp');
+                this.pvcBtn = document.getElementById('btn-pvc');
+                this.difficultySelect = document.getElementById('difficulty-select');
+                this.startGameBtn = document.getElementById('btn-start-game');
+
+                this.onSquareClick = null;
+            }
+
+            init(board, onSquareClick) {
+                this.onSquareClick = onSquareClick;
+                this.renderBoard(board);
+
+                this.boardElement.addEventListener('click', (e) => {
+                    const square = e.target.closest('.square');
+                    if (square) {
+                        const row = parseInt(square.dataset.row);
+                        const col = parseInt(square.dataset.col);
+                        if (this.onSquareClick) {
+                            this.onSquareClick(row, col);
+                        }
+                    }
+                });
+            }
+
+            bindStartScreenEvents(onStart) {
+                this.pvpBtn.addEventListener('click', () => {
+                    this.pvpBtn.classList.add('selected');
+                    this.pvcBtn.classList.remove('selected');
+                    this.difficultySelect.classList.add('hidden');
+                });
+
+                this.pvcBtn.addEventListener('click', () => {
+                    this.pvcBtn.classList.add('selected');
+                    this.pvpBtn.classList.remove('selected');
+                    this.difficultySelect.classList.remove('hidden');
+                });
+
+                this.startGameBtn.addEventListener('click', () => {
+                    const mode = this.pvpBtn.classList.contains('selected') ? 'pvp' : 'pvc';
+                    const difficulty = document.getElementById('difficulty').value;
+                    this.hideStartScreen();
+                    onStart(mode, difficulty);
+                });
+            }
+
+            showStartScreen() {
+                this.startScreen.classList.remove('hidden');
+            }
+
+            hideStartScreen() {
+                this.startScreen.classList.add('hidden');
+            }
+
+            showLevelUpModal(piece, skills, onSelect) {
+                this.modalTitle.textContent = `${piece.getName()} レベルアップ！`;
+                this.modalBody.innerHTML = '<p>習得するスキルを選択してください:</p>';
+                const skillContainer = document.createElement('div');
+                skillContainer.className = 'skill-selection';
+
+                skills.forEach(skill => {
+                    const btn = document.createElement('div');
+                    btn.className = 'skill-card';
+                    btn.innerHTML = `<strong>${skill.name}</strong>
+                                    <p>${skill.description}</p>`;
+                    btn.addEventListener('click', () => {
+                        this.hideModal();
+                        onSelect(skill);
+                    });
+                    skillContainer.appendChild(btn);
+                });
+
+                this.modalBody.appendChild(skillContainer);
+                this.modalCloseBtn.classList.add('hidden');
+                this.modalOverlay.classList.remove('hidden');
+            }
+
+            showPromotionModal(color, onSelect) {
+                this.modalTitle.textContent = 'プロモーション';
+                this.modalBody.innerHTML = '<p>昇格する駒を選択してください:</p>';
+                const container = document.createElement('div');
+                container.className = 'skill-selection';
+
+                const options = [
+                    { name: 'クイーン', class: Queen },
+                    { name: 'ルーク', class: Rook },
+                    { name: 'ビショップ', class: Bishop },
+                    { name: 'ナイト', class: Knight }
+                ];
+
+                options.forEach(opt => {
+                    const btn = document.createElement('div');
+                    btn.className = 'skill-card';
+                    btn.innerHTML = `<strong>${opt.name}</strong>`;
+                    btn.addEventListener('click', () => {
+                        this.hideModal();
+                        onSelect(opt.class);
+                    });
+                    container.appendChild(btn);
+                });
+
+                this.modalBody.appendChild(container);
+                this.modalCloseBtn.classList.add('hidden');
+                this.modalOverlay.classList.remove('hidden');
+            }
+
+            showGameOverModal(message, onRestart) {
+                this.modalTitle.textContent = 'ゲーム終了';
+                this.modalBody.innerHTML = `<h3>${message}</h3>`;
+                this.modalCloseBtn.textContent = 'もう一度プレイ';
+                this.modalCloseBtn.classList.remove('hidden');
+
+                const newBtn = this.modalCloseBtn.cloneNode(true);
+                this.modalCloseBtn.parentNode.replaceChild(newBtn, this.modalCloseBtn);
+                this.modalCloseBtn = newBtn;
+
+                this.modalCloseBtn.addEventListener('click', () => {
+                    this.hideModal();
+                    onRestart();
+                });
+
+                this.modalOverlay.classList.remove('hidden');
+            }
+
+            hideGameOverModal() {
+                this.hideModal();
+            }
+
+            hideModal() {
+                this.modalOverlay.classList.add('hidden');
+            }
+
+            renderBoard(board) {
+                this.boardElement.innerHTML = '';
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const
+                            square = document.createElement('div'); square.className = `square ${(r + c) % 2 === 0
+                                ? 'light' : 'dark'}`; square.dataset.row = r; square.dataset.col = c; const
+                                    piece = board.getPiece(r, c); if (piece) {
+                                        const
+                                            pieceDiv = document.createElement('div'); pieceDiv.className = 'piece';
+                                        pieceDiv.textContent = this.getPieceSymbol(piece);
+                                        pieceDiv.classList.add(piece.color); if (piece.color === PieceColor.WHITE) {
+                                            pieceDiv.style.textShadow = '0 0 2px #000';
+                                        } else {
+                                            pieceDiv.style.textShadow = '0 0 2px #fff';
+                                        } square.appendChild(pieceDiv);
+                                    }
+                        this.boardElement.appendChild(square);
+                    }
+                }
+            } getPieceSymbol(piece) {
+                const
+                    symbols = {
+                        'white': {
+                            'pawn': '♙', 'rook': '♖', 'knight': '♘', 'bishop'
+                                : '♗', 'queen': '♕', 'king': '♔'
+                        }, 'black': {
+                            'pawn': '♟', 'rook': '♜'
+                            , 'knight': '♞', 'bishop': '♝', 'queen': '♛', 'king': '♚'
+                        }
+                    }; return
+                symbols[piece.color][piece.type] || '?';
+            } highlightSquares(squares,
+                type = 'valid-move') {
+                const
+                    allSquares = this.boardElement.querySelectorAll('.square');
+                allSquares.forEach(sq => {
+                    if (type === 'valid-move') {
+                        sq.classList.remove('valid-move');
+                        sq.classList.remove('skill');
+                    } else {
+                        sq.classList.remove(type);
+                    }
+                });
+
+                squares.forEach(pos => {
+                    const index = pos.row * 8 + pos.col;
+                    if (allSquares[index]) {
+                        allSquares[index].classList.add(type);
+                        if (pos.type === 'skill') {
+                            allSquares[index].classList.add('skill');
+                        }
+                    }
+                });
+            }
+
+            clearHighlights() {
+                const allSquares = this.boardElement.querySelectorAll('.square');
+                allSquares.forEach(sq => {
+                    sq.classList.remove('selected');
+                    sq.classList.remove('valid-move');
+                    sq.classList.remove('valid-capture');
+                    sq.classList.remove('skill');
+                });
+            }
+
+            clearMoveVisualization() {
+                const arrows = this.boardElement.querySelectorAll('.move-arrow');
+                arrows.forEach(arrow => arrow.remove());
+                const highlights = this.boardElement.querySelectorAll('.history-highlight');
+                highlights.forEach(hl => hl.classList.remove('history-highlight'));
+            }
+
+            visualizeMove(from, to) {
+                this.clearMoveVisualization();
+                const squares = this.boardElement.querySelectorAll('.square');
+                const fromIndex = from.row * 8 + from.col;
+                const toIndex = to.row * 8 + to.col;
+
+                if (squares[fromIndex]) squares[fromIndex].classList.add('history-highlight');
+                if (squares[toIndex]) squares[toIndex].classList.add('history-highlight');
+
+                const boardRect = this.boardElement.getBoundingClientRect();
+                const squareSize = boardRect.width / 8;
+
+                const x1 = (from.col * squareSize) + (squareSize / 2);
+                const y1 = (from.row * squareSize) + (squareSize / 2);
+                const x2 = (to.col * squareSize) + (squareSize / 2);
+                const y2 = (to.row * squareSize) + (squareSize / 2);
+
+                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                svg.classList.add('move-arrow');
+                svg.setAttribute('width', '100%');
+                svg.setAttribute('height', '100%');
+                svg.style.position = 'absolute';
+                svg.style.top = '0';
+                svg.style.left = '0';
+                svg.style.pointerEvents = 'none';
+                svg.style.zIndex = '10';
+
+                const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+                const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+                marker.setAttribute('id', 'arrowhead');
+                marker.setAttribute('markerWidth', '10');
+                marker.setAttribute('markerHeight', '7');
+                marker.setAttribute('refX', '10');
+                marker.setAttribute('refY', '3.5');
+                marker.setAttribute('orient', 'auto');
+
+                const polygon = document.createElementNS("http://www.w3.org/2000/svg",
+                    "polygon");
+                polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
+                polygon.setAttribute('fill', '#ffd700');
+                polygon.style.opacity = '0.8';
+
+                marker.appendChild(polygon);
+                defs.appendChild(marker);
+                svg.appendChild(defs);
+
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                line.setAttribute('stroke', '#ffd700');
+                line.setAttribute('stroke-width', '4');
+                line.setAttribute('marker-end', 'url(#arrowhead)');
+                line.style.opacity = '0.8';
+
+                svg.appendChild(line);
+                this.boardElement.appendChild(svg);
+            }
+
+            log(message, type = 'normal', colorClass = '', moveData = null) {
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type} ${colorClass}`;
+                entry.innerHTML = `> ${message}`;
+
+                if (moveData) {
+                    entry.dataset.fromRow = moveData.from.row;
+                    entry.dataset.fromCol = moveData.from.col;
+                    entry.dataset.toRow = moveData.to.row;
+                    entry.dataset.toCol = moveData.to.col;
+                    entry.style.cursor = 'pointer';
+                    entry.title = 'クリックして移動を表示';
+
+                    entry.addEventListener('click', () => {
+                        this.visualizeMove(moveData.from, moveData.to);
+                    });
+                }
+
+                this.logElement.prepend(entry);
+            }
+
+            clearLog() {
+                this.logElement.innerHTML = '';
+                const startMsg = document.createElement('div');
+                startMsg.className = 'log-entry';
+                startMsg.textContent = 'ゲーム開始';
+                this.logElement.appendChild(startMsg);
+            }
+
+            updateTurn(color, turnCount = 1, maxTurns = 60) {
+                const turnText = color === PieceColor.WHITE ? '白の番' : '黒の番';
+                this.turnIndicator.textContent = `${turnText} (ターン: ${turnCount}/${maxTurns})`;
+                this.turnIndicator.style.color = color === PieceColor.WHITE ? '#fff' : '#aaa';
+            }
+
+            showPieceDetails(piece) {
+                if (!piece) {
+                    this.pieceDetailsElement.innerHTML = '<p class="placeholder-text">コマを選択して詳細を表示
+                                        </p > ';
+                    return;
+                }
+
+                this.pieceDetailsElement.innerHTML = `
+                                        <div class="detail-row"><strong>種類:</strong> ${piece.getName()}</div>
+                                        <div class="detail-row"><strong>所属:</strong> ${piece.color === 'white' ? '白' :
+                        '黒'}</div>
+                                        <div class="detail-row"><strong>レベル:</strong> ${piece.level}</div>
+                                        <div class="detail-row"><strong>経験値:</strong> ${piece.xp}</div>
+                                        <div class="detail-row"><strong>スキル:</strong> ${piece.skills.length ?
+                        piece.skills.map(s => s.name).join(', ') : 'なし'}</div>
+                                        `;
+            }
+        }
+
+        // --- Game.js ---
+        class Game {
+            constructor() {
+                this.board = new Board();
+                this.ui = new UI();
+                this.currentTurn = PieceColor.WHITE;
+                this.selectedPiece = null;
+                this.selectedPos = null;
+                this.validMoves = [];
+                this.lastMove = null;
+
+                this.gameMode = 'pvp';
+                this.aiDifficulty = 'easy';
+                this.turnCount = 1;
+                this.maxTurns = 60;
+                this.isGameOver = false;
+            }
+
+            start(mode = 'pvp', difficulty = 'easy') {
+                this.gameMode = mode;
+                this.aiDifficulty = difficulty;
+                this.resetGame();
+                this.ui.init(this.board, this.handleSquareClick.bind(this));
+                this.ui.updateTurn(this.currentTurn, this.turnCount, this.maxTurns);
+                this.ui.log(`ゲーム開始 (${mode === 'pvc' ? 'VS CPU - ' + difficulty : 'VS
+                                        Player'})`);
+                                        }
+
+            resetGame() {
+                this.board.init();
+                this.currentTurn = PieceColor.WHITE;
+                this.selectedPiece = null;
+                this.selectedPos = null;
+                this.validMoves = [];
+                this.lastMove = null;
+                this.turnCount = 1;
+                this.isGameOver = false;
+                this.ui.renderBoard(this.board);
+                this.ui.updateTurn(this.currentTurn, this.turnCount, this.maxTurns);
+                this.ui.hideGameOverModal();
+                this.ui.clearLog();
+            }
+
+            handleSquareClick(row, col) {
+                if (this.isGameOver) return;
+
+                if (this.gameMode === 'pvc' && this.currentTurn === PieceColor.BLACK) {
+                    const clickedPiece = this.board.getPiece(row, col);
+                    if (clickedPiece) {
+                        this.ui.showPieceDetails(clickedPiece);
+                        this.ui.clearHighlights();
+                        this.ui.highlightSquares([{ row, col }], 'selected');
+                    }
+                    return;
+                }
+
+                const clickedPiece = this.board.getPiece(row, col);
+
+                if (this.selectedPiece) {
+                    if (this.selectedPiece.color === this.currentTurn) {
+                        const move = this.validMoves.find(m => m.row === row && m.col === col);
+                        if (move) {
+                            this.executeMove(move);
+                            return;
+                        }
+                    }
+
+                    if (clickedPiece) {
+                        this.selectPiece(clickedPiece, row, col);
+                        return;
+                    }
+
+                    this.deselectPiece();
+                } else {
+                    if (clickedPiece) {
+                        this.selectPiece(clickedPiece, row, col);
+                    }
+                }
+            }
+
+            selectPiece(piece, row, col) {
+                this.selectedPiece = piece;
+                this.selectedPos = { row, col };
+
+                if (piece.color === this.currentTurn) {
+                    this.validMoves = Rules.getValidMoves(this.board, piece, row, col,
+                        this.lastMove);
+
+                    this.ui.clearHighlights();
+                    this.ui.highlightSquares([{ row, col }], 'selected');
+                    this.ui.highlightSquares(this.validMoves, 'valid-move');
+
+                    const captures = this.validMoves.filter(m => {
+                        const target = this.board.getPiece(m.row, m.col);
+                        return target && target.color !== piece.color;
+                    });
+                    this.ui.highlightSquares(captures, 'valid-capture');
+                } else {
+                    this.validMoves = [];
+                    this.ui.clearHighlights();
+                    this.ui.highlightSquares([{ row, col }], 'selected');
+                }
+
+                this.ui.showPieceDetails(piece);
+            }
+
+            deselectPiece() {
+                this.selectedPiece = null;
+                this.selectedPos = null;
+                this.validMoves = [];
+                this.ui.clearHighlights();
+                this.ui.showPieceDetails(null);
+                this.ui.clearMoveVisualization();
+            }
+
+            executeMove(move) {
+                const fromRow = move.from ? move.from.row : this.selectedPos.row;
+                const fromCol = move.from ? move.from.col : this.selectedPos.col;
+                const piece = move.piece || this.selectedPiece;
+
+                let destRow = move.row;
+                let destCol = move.col;
+
+                if (move.to) {
+                    destRow = move.to.row;
+                    destCol = move.to.col;
+                }
+
+                // Handle Special Moves
+                let capturedPiece = null;
+                if (move.type === 'en_passant') {
+                    const captureRow = fromRow;
+                    const captureCol = destCol;
+                    capturedPiece = this.board.getPiece(captureRow, captureCol);
+                    this.board.setPiece(captureRow, captureCol, null);
+                    this.board.movePiece(fromRow, fromCol, destRow, destCol);
+                } else if (move.type === 'castling_king') {
+                    this.board.movePiece(fromRow, fromCol, destRow, destCol);
+                    this.board.movePiece(fromRow, 7, fromRow, 5); // Rook h->f
+                } else if (move.type === 'castling_queen') {
+                    this.board.movePiece(fromRow, fromCol, destRow, destCol);
+                    this.board.movePiece(fromRow, 0, fromRow, 3); // Rook a->d
+                } else {
+                    capturedPiece = this.board.movePiece(fromRow, fromCol, destRow, destCol);
+                }
+
+                // Update Last Move
+                this.lastMove = {
+                    piece: piece, from: { row: fromRow, col: fromCol }, to: {
+                        row:
+                            destRow, col: destCol
+                    }
+                };
+
+                let logMsg = `${piece.getName()} が ${this.coordsToNotation(destRow, destCol)}
+                                        に移動`;
+                let logType = 'normal';
+                const colorClass = piece.color;
+
+                if (move.type === 'skill' || (move.to && move.to.type === 'skill')) {
+                    logMsg += " [スキル]";
+                    logType = 'skill';
+                } else if (move.type === 'castling_king' || move.type === 'castling_queen') {
+                    logMsg = "キャスリング！";
+                    logType = 'skill';
+                } else if (move.type === 'en_passant') {
+                    logMsg += " [アンパッサン]";
+                    logType = 'skill';
+                }
+
+                const moveData = {
+                    from: { row: fromRow, col: fromCol }, to: {
+                        row: destRow,
+                        col: destCol
+                    }
+                };
+
+                // Check Promotion
+                if (piece.type === PieceType.PAWN && (destRow === 0 || destRow === 7)) {
+                    if (this.gameMode === 'pvc' && piece.color === PieceColor.BLACK) {
+                        // AI Auto Promote
+                        const newPiece = new Queen(piece.color);
+                        this.transferStats(piece, newPiece);
+                        this.board.setPiece(destRow, destCol, newPiece);
+                        logMsg += " (クイーンに昇格)";
+                        this.completeMoveProcessing(newPiece, capturedPiece, logMsg, logType,
+                            colorClass, moveData);
+                    } else {
+                        // Player Promotion
+                        this.ui.renderBoard(this.board);
+                        this.ui.showPromotionModal(piece.color, (PieceClass) => {
+                            const newPiece = new PieceClass(piece.color);
+                            this.transferStats(piece, newPiece);
+                            this.board.setPiece(destRow, destCol, newPiece);
+                            logMsg += ` (${newPiece.getName()}に昇格)`;
+                            this.completeMoveProcessing(newPiece, capturedPiece, logMsg, logType,
+                                colorClass, moveData);
+                        });
+                    }
+                    return;
+                }
+
+                this.completeMoveProcessing(piece, capturedPiece, logMsg, logType, colorClass,
+                    moveData);
+            }
+
+            transferStats(oldPiece, newPiece) {
+                newPiece.level = oldPiece.level;
+                newPiece.xp = oldPiece.xp;
+                newPiece.skills = oldPiece.skills;
+                newPiece.id = oldPiece.id;
+                newPiece.hasMoved = true;
+            }
+
+            completeMoveProcessing(piece, capturedPiece, logMsg, logType, colorClass,
+                moveData) {
+                let xpGained = 0;
+                if (capturedPiece) {
+                    logMsg += ` (${capturedPiece.getName()} を撃破)`;
+                    logType = 'capture';
+                    let captureXp = 50;
+
+                    if (piece.skills.some(s => s.id === 'berserk')) {
+                        captureXp *= 2;
+                        logMsg += " [バーサーク]";
+                    }
+
+                    xpGained += captureXp;
+
+                    if (capturedPiece.type === PieceType.KING) {
+                        this.ui.log(logMsg, logType, colorClass, moveData);
+                        this.ui.renderBoard(this.board);
+                        this.gameOver(piece.color);
+                        return;
+                    }
+                }
+
+                xpGained += 10;
+
+                let leveledUp = false;
+                if (xpGained > 0) {
+                    leveledUp = piece.addXp(xpGained);
+                    logMsg += ` (+${xpGained} XP)`;
+
+                    if (leveledUp) {
+                        this.handleLevelUp(piece);
+                    }
+                }
+
+                this.ui.log(logMsg, logType, colorClass, moveData);
+                this.ui.renderBoard(this.board);
+                this.deselectPiece();
+
+                if (!leveledUp) {
+                    this.switchTurn();
+                }
+            }
+
+            handleLevelUp(piece) {
+                if (this.gameMode === 'pvc' && piece.color === PieceColor.BLACK) {
+                    const skills = skillSystem.getRandomSkills(piece);
+                    const randomSkill = skills[0];
+                    skillSystem.applySkill(piece, randomSkill);
+                    this.ui.log(`(CPU) ${piece.getName()} が ${randomSkill.name} を習得！`, 'level-up',
+                        piece.color);
+                    this.switchTurn();
+                    return;
+                }
+
+                const skills = skillSystem.getRandomSkills(piece);
+                this.ui.showLevelUpModal(piece, skills, (selectedSkill) => {
+                    skillSystem.applySkill(piece, selectedSkill);
+                    this.ui.log(`${piece.getName()} が ${selectedSkill.name} を習得！`, 'level-up',
+                        piece.color);
+                    this.ui.showPieceDetails(piece);
+                    this.switchTurn();
+                });
+            }
+
+            switchTurn() {
+                if (this.isGameOver) return;
+
+                if (this.currentTurn === PieceColor.BLACK) {
+                    this.turnCount++;
+                    if (this.turnCount > this.maxTurns) {
+                        this.checkSuddenDeath();
+                        return;
+                    }
+                }
+
+                this.currentTurn = this.currentTurn === PieceColor.WHITE ? PieceColor.BLACK :
+                    PieceColor.WHITE;
+                this.ui.updateTurn(this.currentTurn, this.turnCount, this.maxTurns);
+
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const
+                            p = this.board.getPiece(r, c); if (p && p.color === this.currentTurn) {
+                                if
+                                    (p.skills.some(s => s.id === 'regeneration')) {
+                                    const regenAmount = 10;
+                                    const leveledUp = p.addXp(regenAmount);
+                                    this.ui.log(`${p.getName()} が自動回復 (+${regenAmount} XP)`, 'skill', p.color);
+                                    if (leveledUp) {
+                                        this.handleLevelUp(p);
+                                    }
+                                }
+                            }
+                    }
+                }
+
+                if (this.gameMode === 'pvc' && this.currentTurn === PieceColor.BLACK) {
+                    setTimeout(() => {
+                        const bestMove = AI.getBestMove(this.board, PieceColor.BLACK,
+                            this.aiDifficulty, this.lastMove);
+                        if (bestMove) {
+                            this.executeMove(bestMove);
+                        } else {
+                            this.ui.log("CPUは移動できる駒がありません。", 'normal');
+                            this.switchTurn();
+                        }
+                    }, 500);
+                }
+            }
+
+            checkSuddenDeath() {
+                let whiteScore = 0;
+                let blackScore = 0;
+
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const
+                            p = this.board.getPiece(r, c); if (p) {
+                                const val = AI.getPieceValue(p); if
+                                    (p.color === PieceColor.WHITE) whiteScore += val; else blackScore += val;
+                            }
+                    }
+                } if (whiteScore > blackScore) this.gameOver(PieceColor.WHITE);
+                else if (blackScore > whiteScore) this.gameOver(PieceColor.BLACK);
+                else this.gameOver('draw');
+            }
+
+            gameOver(winner) {
+                this.isGameOver = true;
+                let msg = '';
+                if (winner === PieceColor.WHITE) msg = "白の勝利！";
+                else if (winner === PieceColor.BLACK) msg = "黒の勝利！";
+                else msg = "引き分け！";
+
+                this.ui.log(`ゲーム終了: ${msg}`, 'level-up');
+                this.ui.showGameOverModal(msg, () => {
+                    this.start(this.gameMode, this.aiDifficulty);
+                });
+            }
+
+            coordsToNotation(row, col) {
+                const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                const rank = 8 - row;
+                return `${files[col]}${rank}`;
+            }
+        }
+
+        // --- main.js ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const game = new Game();
+            game.ui.bindStartScreenEvents((mode, difficulty) => {
+                game.start(mode, difficulty);
+            });
+            game.ui.showStartScreen();
+        });
+    </script>
+</body>
+
+</html>

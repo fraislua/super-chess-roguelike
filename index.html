@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperChess</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="game-header">
+            <h1>SuperChess <span class="version">Alpha</span></h1>
+            <div class="game-info">
+                <span id="turn-indicator">プレイヤーのターン</span>
+                <span id="phase-indicator">フェーズ: 配置</span>
+            </div>
+        </header>
+
+        <main class="game-area">
+            <div class="board-container">
+                <div id="board" class="chess-board"></div>
+            </div>
+            <aside class="side-panel">
+                <div class="panel-section stats-section">
+                    <h2>選択中のコマ</h2>
+                    <div id="piece-details" class="details-box">
+                        <p class="placeholder-text">コマを選択して詳細を表示</p>
+                    </div>
+                </div>
+                <div id="skill-selection-panel" class="panel-section hidden">
+                    <h2>スキル選択</h2>
+                    <div id="skill-options" class="skill-selection"></div>
+                </div>
+                <div class="panel-section log-section">
+                    <h2>バトルログ</h2>
+                    <div id="game-log" class="log-box">
+                        <div class="log-entry">ゲーム開始</div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <div id="start-screen" class="modal-overlay">
+        <div class="modal-content start-menu">
+            <h2>SuperChess</h2>
+            <p>モードを選択してください</p>
+            <div class="mode-selection">
+                <button id="btn-pvp" class="menu-btn selected">VS Player</button>
+                <button id="btn-pvc" class="menu-btn">VS CPU</button>
+            </div>
+            <div id="difficulty-select" class="difficulty-selection hidden">
+                <label for="difficulty">難易度:</label>
+                <select id="difficulty">
+                    <option value="easy">Easy (ランダム)</option>
+                    <option value="normal" selected>Normal (攻撃的)</option>
+                    <option value="hard">Hard (探索)</option>
+                </select>
+            </div>
+            <button id="btn-start-game" class="menu-btn primary">ゲーム開始</button>
+        </div>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 id="modal-title">タイトル</h2>
+            <div id="modal-body"></div>
+            <button id="modal-close-btn">閉じる</button>
+        </div>
+    </div>
+
+    <script src="src/EventEmitter.js"></script>
+    <script src="src/Skill.js"></script>
+    <script src="src/SkillSystem.js"></script>
+    <script src="src/Piece.js"></script>
+    <script src="src/Board.js"></script>
+    <script src="src/Rules.js"></script>
+    <script src="src/AI.js"></script>
+    <script src="src/UI.js"></script>
+    <script src="src/Game.js"></script>
+    <script src="src/main.js"></script>
+</body>
+
+</html>
