@@ -100,6 +100,10 @@ class Game extends EventEmitter {
 
             // Clicking another piece -> Select it (regardless of color)
             if (clickedPiece) {
+                // 【Tier 2】Tactical Breakthrough Restriction Log
+                if (this.restrictedPiece && clickedPiece !== this.restrictedPiece && clickedPiece.color === this.currentTurn) {
+                    this.emit('log', "追加ターン中は、スキルを獲得した駒のみ行動できます。", 'warning');
+                }
                 this.selectPiece(clickedPiece, row, col);
                 return;
             }
@@ -108,6 +112,10 @@ class Game extends EventEmitter {
         } else {
             // No piece selected, try selecting
             if (clickedPiece) {
+                // 【Tier 2】Tactical Breakthrough Restriction Log
+                if (this.restrictedPiece && clickedPiece !== this.restrictedPiece && clickedPiece.color === this.currentTurn) {
+                    this.emit('log', "追加ターン中は、スキルを獲得した駒のみ行動できます。", 'warning');
+                }
                 this.selectPiece(clickedPiece, row, col);
             }
         }
@@ -182,6 +190,10 @@ class Game extends EventEmitter {
         // 【Tier 2】Cross Switch (入れ替え移動 / 押し出し)
         if (move.type === 'cross_switch') {
             const targetPiece = this.board.getPiece(destRow, destCol);
+
+            // Clear source position to prevent duplication
+            this.board.setPiece(fromRow, fromCol, null);
+
             // 1. 自分を移動先に
             this.board.setPiece(destRow, destCol, piece);
             // 2. 相手(味方)を pushBack の場所に
@@ -368,9 +380,8 @@ class Game extends EventEmitter {
 
         // 【Tier 2】Combo Stance Update
         if (capturedPiece) {
-            piece.hasKilledLastTurn = true;
-        } else {
-            piece.hasKilledLastTurn = false;
+            // 敵撃破時、次ターンに効果発動 (pending)
+            piece.comboState = 'pending';
         }
 
         xpGained += 10; // Move Action XP
@@ -582,6 +593,13 @@ class Game extends EventEmitter {
                             skill.onTurnStart(p, this);
                         }
                     });
+
+                    // 【Tier 2】Combo Stance State Transition
+                    if (p.comboState === 'pending') {
+                        p.comboState = 'active'; // 次ターン(今)開始で有効化
+                    } else if (p.comboState === 'active') {
+                        p.comboState = 'none'; // 1ターン経過で終了
+                    }
                 }
             }
         }

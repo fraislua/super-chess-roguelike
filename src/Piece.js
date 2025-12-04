@@ -26,7 +26,7 @@ class Piece {
         this.skills = [];
 
         // Tier 2: Combo Stance logic
-        this.hasKilledLastTurn = false;
+        this.comboState = 'none'; // 'none' | 'pending' | 'active'
     }
 
     addXp(amount) {
@@ -61,7 +61,7 @@ class Piece {
 
     // 共通: 連撃 (Combo Stance) 用の動き（クイーン化）
     getComboMoves(board, row, col) {
-        if (this.hasSkill('combo_stance') && this.hasKilledLastTurn) {
+        if (this.hasSkill('combo_stance') && this.comboState === 'active') {
             // クイーンの動き（縦横斜め無限）を返す
             // ※元がクイーンの場合は意味がないが、他の駒が強力になる
             return this.getSlidingMoves(board, row, col,
