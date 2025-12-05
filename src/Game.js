@@ -769,16 +769,25 @@ class Game extends EventEmitter {
         }
 
         // CPU Move
+        // ★変更箇所: CPUの思考呼び出し
         if (this.gameMode === 'pvc' && this.currentTurn === PieceColor.BLACK) {
-            setTimeout(() => {
-                const bestMove = AI.getBestMove(this.board, PieceColor.BLACK, this.aiDifficulty, this.lastMove);
+            // UIに思考中であることを伝えるログを出すと親切です
+            this.emit('log', "CPU思考中...", 'normal');
+
+            // 非同期でAIを実行
+            // setTimeoutはAI.js側でsleepを入れたので、ここでは直接呼んでもOKですが、
+            // 呼び出し自体を非同期チェーンにするため念の為残しても良いです。
+            setTimeout(async () => {
+                // awaitで結果を待つ
+                const bestMove = await AI.getBestMove(this.board, PieceColor.BLACK, this.aiDifficulty, this.lastMove);
+
                 if (bestMove) {
                     this.executeMove(bestMove);
                 } else {
                     this.emit('log', "CPUは移動できる駒がありません。", 'normal');
-                    this.switchTurn();
+                    this.switchTurn(); // またはGameOver処理
                 }
-            }, 500);
+            }, 100); // 描画更新のためのわずかな猶予
         }
     }
 

@@ -30,7 +30,7 @@ class AI {
     //  Minimax & Core Logic (変更なし部分は省略)
     // ---------------------------------------------------------
 
-    static getBestMove(board, color, difficulty, lastMove) {
+    static async getBestMove(board, color, difficulty, lastMove) {
         // ... (以前と同じ) ...
         const allMoves = this.getAllMoves(board, color, lastMove);
         if (allMoves.length === 0) return null;
@@ -40,7 +40,11 @@ class AI {
         return this.getRandomMove(allMoves);
     }
 
-    static getMinimaxMove(board, color, lastMove, depth) {
+    static sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    static async getMinimaxMove(board, color, lastMove, depth) {
         // ... (以前と同じ) ...
         let bestMove = null;
         let bestScore = -Infinity;
@@ -51,6 +55,9 @@ class AI {
         this.orderMoves(moves, board); // 成長予測を含んだ順序付けが行われる
 
         for (const move of moves) {
+
+            await this.sleep(0);
+
             const clonedBoard = board.clone();
             this.simulateMove(clonedBoard, move); // ここでXP計算も行われる
             const score = this.minimax(clonedBoard, depth - 1, alpha, beta, false, color);
