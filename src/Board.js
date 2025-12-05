@@ -55,6 +55,11 @@ class Board {
         const piece = this.getPiece(fromRow, fromCol);
         const target = this.getPiece(toRow, toCol);
         if (piece) {
+            // Self-move check (for Field Promotion validation)
+            if (fromRow === toRow && fromCol === toCol) {
+                return target; // Do nothing, just return target (which is self)
+            }
+
             this.grid[toRow][toCol] = piece;
             this.grid[fromRow][fromCol] = null;
             piece.hasMoved = true;
