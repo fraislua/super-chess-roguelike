@@ -410,7 +410,7 @@ class Game extends EventEmitter {
                 // 【Tier 4】Decoy (影武者): キングが取られた時、影武者を選択して入れ替わる
                 const validDecoyAllies = this.getValidDecoyAllies(capturedPiece.color);
 
-                if (validDecoyAllies.length > 0) {
+                if (capturedPiece.hasSkill('decoy') && validDecoyAllies.length > 0) {
                     // 自動で選ばず、選択状態に入る
                     this.isSelectingDecoy = true;
                     this.decoyKing = capturedPiece; // 取られたキング（今は盤上にいない、あるいはcapturedPieceとして保持）

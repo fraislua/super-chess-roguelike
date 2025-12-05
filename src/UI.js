@@ -47,6 +47,9 @@ class UI {
 
         // Bind Click Events
         this.boardElement.addEventListener('click', (e) => {
+            // Block interaction if modal is open
+            if (!this.modalOverlay.classList.contains('hidden')) return;
+
             const square = e.target.closest('.square');
             if (square) {
                 const row = parseInt(square.dataset.row);
@@ -57,6 +60,9 @@ class UI {
 
         // Global click to clear highlights
         document.addEventListener('click', (e) => {
+            // Block interaction if modal is open
+            if (!this.modalOverlay.classList.contains('hidden')) return;
+
             const isLogEntry = e.target.closest('.log-entry');
             const isSquare = e.target.closest('.square');
             const isModal = e.target.closest('.modal-content'); // Assuming modal content has this class or similar, but checking overlay is safer if modal is open.
