@@ -146,7 +146,21 @@ class FieldPromotionSkill extends Skill {
     constructor() {
         super('field_promotion', '現地任官', 'その場でプロモーションを行うことができる', 'action', 3, [PieceType.PAWN]);
     }
-    // ロジックは Piece.getValidMoves (Pawn) に実装
+
+    onAcquire(piece, game) {
+        if (game) {
+            game.emit('requestPromotion', piece.color, (PieceClass) => {
+                const newPiece = new PieceClass(piece.color);
+                game.transferStats(piece, newPiece);
+                game.board.setPiece(piece.row, piece.col, newPiece);
+                game.emit('boardUpdated', game.board);
+                game.emit('log', `${piece.getName()} が現地任官により ${newPiece.getName()} に昇格！`, 'skill', piece.color);
+
+                // 選択状態を解除して再描画
+                game.deselectPiece();
+            });
+        }
+    }
 }
 
 class KingsChargeSkill extends Skill {
