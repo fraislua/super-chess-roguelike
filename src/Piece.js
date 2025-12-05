@@ -103,26 +103,34 @@ class Piece {
                     // Occupied square
                     if (target.color !== this.color) {
                         // Enemy
-                        if (hasTyrantsMarch) {
-                            // Tyrant's March: Record enemy and continue
-                            enemiesInPath.push({ piece: target, row: r, col: c });
-                            // Don't add capture move yet, must land on empty square
-                        } else {
-                            // Normal Capture
-                            moves.push({ row: r, col: c, type: 'capture' });
 
-                            // 【Tier 3】Piercing (貫通)
-                            if (hasPiercing) {
-                                let pr = r + dir[0];
-                                let pc = c + dir[1];
-                                if (board.isValidPosition(pr, pc)) {
-                                    const pTarget = board.getPiece(pr, pc);
-                                    // 貫通先が敵なら「2枚抜き」
-                                    if (pTarget && pTarget.color !== this.color) {
-                                        moves.push({ row: pr, col: pc, type: 'pierce_capture', secondTarget: { row: pr, col: pc } });
-                                    }
+                        // 1. Normal Capture (Always available as an option to stop here)
+                        moves.push({ row: r, col: c, type: 'capture' });
+
+                        // 2. Skill Specific Extensions
+                        if (hasTyrantsMarch) {
+                            // Tyrant's March: Record enemy and continue (to crush through)
+                            enemiesInPath.push({ piece: target, row: r, col: c });
+                        }
+
+                        // If NOT Tyrant (or if we want to allow Piercing even with Tyrant, but keeping simple for now),
+                        // Fallback to normal specific logic if we didn't just override flow.
+                        // Actually, to keep Piercing valid as an *alternative* to Crushing:
+                        if (!hasTyrantsMarch && hasPiercing) {
+                            // Only check piercing if not processing Tyrant path (or if we want mutually exclusive branching)
+                            // Current logic: Tyrant takes precedence for "going beyond".
+                            // If we want both, we'd need to handle 'enemiesInPath' vs 'pierce logic' carefully.
+                            // For now, keeping "Tyrant disables Piercing loop" behavior but allowing "Capture" (stop).
+                            let pr = r + dir[0];
+                            let pc = c + dir[1];
+                            if (board.isValidPosition(pr, pc)) {
+                                const pTarget = board.getPiece(pr, pc);
+                                if (pTarget && pTarget.color !== this.color) {
+                                    moves.push({ row: pr, col: pc, type: 'pierce_capture', secondTarget: { row: pr, col: pc } });
                                 }
                             }
+                        } else if (!hasTyrantsMarch) {
+                            // If neither Tyrant nor Piercing, standard capture logic ends here (loop breaks in collision handling)
                         }
                     }
 
