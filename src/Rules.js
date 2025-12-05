@@ -75,6 +75,12 @@ class Rules {
             // Already validated in getValidMoves
             clonedBoard.movePiece(fromRow, fromCol, targetRow, targetCol);
             clonedBoard.movePiece(fromRow, 0, fromRow, 3); // Rook a->d
+        } else if (move.type === 'tyrant_move') {
+            // Tyrant's March: Crush enemies on the cloned board so they don't block/attack during check validation
+            if (move.crushed) {
+                move.crushed.forEach(c => clonedBoard.setPiece(c.row, c.col, null));
+            }
+            clonedBoard.movePiece(fromRow, fromCol, targetRow, targetCol);
         } else {
             clonedBoard.movePiece(fromRow, fromCol, targetRow, targetCol);
         }

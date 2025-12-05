@@ -61,6 +61,48 @@ class Game extends EventEmitter {
     // ------------------------------------------------------------------
 
     handleSquareClick(row, col) {
+        // 【Tier 4】Decoy Selection Mode
+        if (this.isSelectingDecoy) {
+            const clickedPiece = this.board.getPiece(row, col);
+
+            // Check if clicked piece is a valid ally
+            // We compare by reference or ID if possible. 
+            // validDecoyAllies contains piece objects.
+            const targetAlly = this.validDecoyAllies.find(p => p === clickedPiece);
+
+            if (targetAlly) {
+                // Perform Swap Logic
+                const allyPos = this.getPiecePosition(targetAlly);
+
+                // 1. King Reappears at Ally Pos
+                this.board.setPiece(allyPos.row, allyPos.col, this.decoyKing);
+
+                // 2. Consume Decoy Skill
+                this.decoyKing.skills = this.decoyKing.skills.filter(s => s.id !== 'decoy');
+
+                // 3. Update Logs & Context
+                let { piece, logMsg, logType, colorClass, moveData, consumedRestriction } = this.pendingDecoyContext;
+                logMsg += ` [影武者発動！身代わり(${targetAlly.getName()})と入れ替わり]`;
+
+                // 4. Resume Move Processing
+                // The "Captured Piece" is now the Ally (who took the fall)
+                // We clear the state first
+                this.isSelectingDecoy = false;
+                this.decoyKing = null;
+                this.validDecoyAllies = [];
+                this.pendingDecoyContext = null;
+
+                this.emit('clearHighlights');
+                this.emit('boardUpdated', this.board);
+
+                // Resume
+                this.completeMoveProcessing(piece, targetAlly, logMsg, logType, colorClass, moveData, consumedRestriction);
+            } else {
+                this.emit('log', "身代わりにする味方を選択してください (ハイライトされた駒のみ)", 'warning');
+            }
+            return;
+        }
+
         if (this.isGameOver || this.isProcessingLevelUp) return;
 
         // CPU turn block
@@ -225,6 +267,18 @@ class Game extends EventEmitter {
         else if (move.type === 'promotion_skill') {
             // Field Promotion: No movement, just trigger promotion
         }
+        else if (move.type === 'tyrant_move') {
+            // Tyrant's March: Crush enemies in path
+            if (move.crushed) {
+                move.crushed.forEach(crush => {
+                    this.board.setPiece(crush.row, crush.col, null);
+                    // ログ用にここで何か記録してもいいが、まとめてログ出力する
+                    logMsg += ` [${crush.piece.getName()}を粉砕]`;
+                });
+            }
+            // Move the tyrant
+            this.board.movePiece(fromRow, fromCol, destRow, destCol);
+        }
         else {
             // Normal / Capture Move
             capturedPiece = this.board.movePiece(fromRow, fromCol, destRow, destCol);
@@ -336,25 +390,37 @@ class Game extends EventEmitter {
             if (capturedPiece.hasSkill('sacrifice')) {
                 this.board.setPiece(moveData.to.row, moveData.to.col, null); // 攻撃側も消滅
                 logMsg += ` [捨て身発動！相打ち]`;
-                // 攻撃側は消えたが、経験値計算などはそのまま進める（死後の功績）
+
+                // 攻撃側（自分）が消滅したので、以降の処理のためにフラグを立てるか、nullにする
+                // ただし、this.completeMoveProcessingの引数 piece はオブジェクトとして残っている。
+                // 盤面上から消えたことを検知する必要がある。
             }
 
             // Check Win Condition (King Capture)
             if (capturedPiece.isRoyal) {
-                // 【Tier 4】Decoy (影武者): キングが取られた時、影武者と入れ替わる
-                const decoy = this.findPieceWithSkill(capturedPiece.color, 'decoy');
-                if (decoy) {
-                    // Decoy (影武者) の位置にキングを復活させる
-                    const decoyPos = this.getPiecePosition(decoy);
-                    if (decoyPos) {
-                        this.board.setPiece(decoyPos.row, decoyPos.col, capturedPiece); // キング復活
-                        // 影武者は消滅（身代わり）
-                        // ※実装上、decoyPosにキングを上書きすれば影武者は消える
-                        logMsg += ` [影武者発動！キング脱出]`;
-                        this.emit('log', logMsg, logType, colorClass, moveData);
-                        this.emit('boardUpdated', this.board);
-                        return; // ゲーム続行
-                    }
+                // 【Tier 4】Decoy (影武者): キングが取られた時、影武者を選択して入れ替わる
+                const validDecoyAllies = this.getValidDecoyAllies(capturedPiece.color);
+
+                if (validDecoyAllies.length > 0) {
+                    // 自動で選ばず、選択状態に入る
+                    this.isSelectingDecoy = true;
+                    this.decoyKing = capturedPiece; // 取られたキング（今は盤上にいない、あるいはcapturedPieceとして保持）
+                    this.validDecoyAllies = validDecoyAllies;
+
+                    // Context save
+                    this.pendingDecoyContext = { piece, logMsg, logType, colorClass, moveData, consumedRestriction };
+
+                    logMsg += ` [影武者発動可能！身代わりを選択してください]`;
+                    this.emit('log', logMsg, logType, colorClass, moveData);
+
+                    // ユーザーに入力を促す (ハイライトなど)
+                    this.emit('boardUpdated', this.board); // Reset board visuals first
+                    this.emit('highlightSquares', validDecoyAllies.map(p => this.getPiecePosition(p)), 'valid-move'); // Apply highlights
+
+                    // ここで処理を中断し、ユーザーのクリックを待つ
+                    // ※ 注意: このメソッドは同期的に走っているが、returnすることで後続の「レベルアップ処理」や「ターン交代」をスキップする。
+                    // ユーザーがクリックした後に、別途 resume 処理が必要。
+                    return;
                 }
 
                 // 【Tier 4】Succession (継承): 王(Royal)が取られた時、継承持ちクイーンが新たな王(Royal)になる
@@ -392,40 +458,79 @@ class Game extends EventEmitter {
 
         // 2. Add XP and Check Level Up
         if (xpGained > 0) {
-            piece.addXp(xpGained);
-            logMsg += ` (+${xpGained} XP)`;
+            // 攻撃側が生存しているか確認 (Sacrificeなどで死んでいる場合はレベルアップしない)
+            // board上で piece を探す
+            const currentPos = this.getPiecePosition(piece);
+            // あるいは、Sacrificeの処理で盤上から消えていれば currentPos は null になるはず
 
-            // 【重要】ここでレベルアップ処理完了後のコールバックを定義
-            this.checkAndProcessLevelUp(piece, () => {
-                // 行動回数を消費
-                this.actionsRemaining--;
+            if (!currentPos) {
+                // 死亡しているのでXP加算などはログに残すが、レベルアップ処理はスキップ
+                // ただしログには出す
+                logMsg += ` (+${xpGained} XP) [死亡]`;
+                // 死んでもXPは入るが、レベルアップ画面は出さない（ゾンビ進化防止）
+                piece.addXp(xpGained);
 
-                // 制限の解除判定:
-                // もし制限付きの行動を消費し、かつ新たな追加ターンが発生していないなら制限解除
-                if (consumedRestriction && !this.extraTurnPending) {
-                    this.restrictedPiece = null;
+                // 王が自爆で死んだ場合のチェック
+                if (piece.isRoyal) {
+                    this.gameOver(piece.color === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
+                    return;
                 }
-
-                // まだ行動回数が残っているなら追加ターン処理へ
-                if (this.actionsRemaining > 0) {
-                    this.resolveExtraTurn();
-                } else {
-                    this.switchTurn(); // 通常の交代
-                }
-            });
-        } else {
-            // XP獲得がない場合でも行動消費
-            this.actionsRemaining--;
-            if (consumedRestriction && !this.extraTurnPending) {
-                this.restrictedPiece = null;
-            }
-
-            if (this.actionsRemaining > 0) {
-                this.resolveExtraTurn();
             } else {
-                this.switchTurn();
+                piece.addXp(xpGained);
+                logMsg += ` (+${xpGained} XP)`;
+
+                // 【重要】ここでレベルアップ処理完了後のコールバックを定義
+                this.checkAndProcessLevelUp(piece, () => {
+                    // 行動回数を消費
+                    this.actionsRemaining--;
+
+                    // 制限の解除判定:
+                    // もし制限付きの行動を消費し、かつ新たな追加ターンが発生していないなら制限解除
+                    if (consumedRestriction && !this.extraTurnPending) {
+                        this.restrictedPiece = null;
+                    }
+
+                    // まだ行動回数が残っているなら追加ターン処理へ
+                    if (this.actionsRemaining > 0) {
+                        this.resolveExtraTurn();
+                    } else {
+                        this.switchTurn(); // 通常の交代
+                    }
+                });
+                return; // レベルアップ処理へ委譲したのでここで抜ける
+            }
+        } else {
+            // XP獲得がない場合 (移動のみなど)
+        }
+
+        // ここに来るのは「XP獲得なし」または「死亡してレベルアップスキップ」の場合
+        // XP獲得ありで生存している場合は上のブロックで return している
+        // XP獲得がない場合でも行動消費
+        this.actionsRemaining--;
+        if (consumedRestriction && !this.extraTurnPending) {
+            this.restrictedPiece = null;
+        }
+
+        if (this.actionsRemaining > 0) {
+            this.resolveExtraTurn();
+        } else {
+            this.switchTurn();
+        }
+    }
+
+
+    // New Helper for Decoy
+    getValidDecoyAllies(color) {
+        const allies = [];
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = this.board.getPiece(r, c);
+                if (p && p.color === color && !p.isRoyal) { // 王自身とは入れ替われない
+                    allies.push(p);
+                }
             }
         }
+        return allies;
     }
 
     checkAndProcessLevelUp(piece, onComplete) {
