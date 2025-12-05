@@ -273,7 +273,8 @@ class Game extends EventEmitter {
                 move.crushed.forEach(crush => {
                     this.board.setPiece(crush.row, crush.col, null);
                     // ログ用にここで何か記録してもいいが、まとめてログ出力する
-                    logMsg += ` [${crush.piece.getName()}を粉砕]`;
+                    //logMsgはこの段階で定義されていません→下のログの部分で表記
+                    //logMsg += ` [${crush.piece.getName()}を粉砕]`;
                 });
             }
             // Move the tyrant
@@ -311,6 +312,14 @@ class Game extends EventEmitter {
         } else if (move.type === 'promotion_skill') {
             logMsg = `${piece.getName()} が現地任官を発動 [スキル]`;
             logType = 'skill';
+        } else if (move.type === 'tyrant_move') {//Tyrant's March 用のログ追記を追加
+            logMsg += " [強者の威圧]";
+            logType = 'skill';
+            if (move.crushed && move.crushed.length > 0) {
+                // 粉砕した敵の名前を列挙
+                const crushedNames = move.crushed.map(c => c.piece.getName()).join(', ');
+                logMsg += ` (${crushedNames} を粉砕)`;
+            }
         }
 
         const moveData = {
