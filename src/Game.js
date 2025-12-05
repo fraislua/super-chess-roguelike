@@ -411,7 +411,30 @@ class Game extends EventEmitter {
                 const validDecoyAllies = this.getValidDecoyAllies(capturedPiece.color);
 
                 if (capturedPiece.hasSkill('decoy') && validDecoyAllies.length > 0) {
-                    // 自動で選ばず、選択状態に入る
+                    // CPU Handling
+                    if (this.gameMode === 'pvc' && capturedPiece.color === PieceColor.BLACK) {
+                        // Randomly select an ally
+                        const targetAlly = validDecoyAllies[Math.floor(Math.random() * validDecoyAllies.length)];
+
+                        // Execute Swap
+                        const allyPos = this.getPiecePosition(targetAlly);
+                        this.board.setPiece(allyPos.row, allyPos.col, capturedPiece); // King moves to Ally pos
+                        this.board.setPiece(moveData.to.row, moveData.to.col, targetAlly); // Ally moves to King pos (to be captured)
+
+                        // Update Coords (handled by setPiece but good to be explicit/safe or if setPiece doesn't update internal props fully if not movePiece)
+                        // setPiece helper updates row/col of the piece object.
+
+                        // Consume Skill
+                        capturedPiece.skills = capturedPiece.skills.filter(s => s.id !== 'decoy');
+
+                        logMsg += ` [影武者発動！(CPU) ${targetAlly.getName()}を身代わり]`;
+
+                        // Resume processing with the Ally as the captured piece
+                        this.completeMoveProcessing(piece, targetAlly, logMsg, logType, colorClass, moveData, consumedRestriction);
+                        return;
+                    }
+
+                    // Human Handling: Selection Mode
                     this.isSelectingDecoy = true;
                     this.decoyKing = capturedPiece; // 取られたキング（今は盤上にいない、あるいはcapturedPieceとして保持）
                     this.validDecoyAllies = validDecoyAllies;
