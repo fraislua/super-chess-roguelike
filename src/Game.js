@@ -674,6 +674,29 @@ class Game extends EventEmitter {
         // ここではフラグや制限をクリアしない（completeMoveProcessingで管理）
         this.emit('log', `>>> 追加行動！ (残り行動回数: ${this.actionsRemaining})`, 'skill', this.currentTurn);
 
+        // 【修正】移動可能マスがあるかチェック
+        if (this.restrictedPiece) {
+            const pos = this.getPiecePosition(this.restrictedPiece);
+            if (pos) {
+                // 現在の盤面での有効な移動を取得
+                const moves = Rules.getValidMoves(this.board, this.restrictedPiece, pos.row, pos.col, this.lastMove);
+
+                // 自分のターンなので動きをフィルタリング (Check回避などを考慮)
+                const validCallbackMoves = moves.filter(m => {
+                    return !Rules.willMoveCauseCheck(this.board, pos.row, pos.col, m, this.currentTurn);
+                });
+
+                if (validCallbackMoves.length === 0) {
+                    this.emit('log', "移動できるマスがありません。追加ターンを終了します。", 'warning', this.currentTurn);
+                    this.actionsRemaining--;
+                    this.restrictedPiece = null;
+                    this.extraTurnPending = false;
+                    this.switchTurn();
+                    return;
+                }
+            }
+        }
+
         // ターン表示更新 (交代はしていないがUI上のターン数は更新しても良い、あるいはそのまま)
         this.emit('turnUpdated', this.currentTurn, this.turnCount, this.maxTurns);
 
