@@ -411,30 +411,32 @@ class Game extends EventEmitter {
                 const validDecoyAllies = this.getValidDecoyAllies(capturedPiece.color);
 
                 if (capturedPiece.hasSkill('decoy') && validDecoyAllies.length > 0) {
-                    // CPU Handling
+
+                    // CPU Auto-Selection
                     if (this.gameMode === 'pvc' && capturedPiece.color === PieceColor.BLACK) {
-                        // Randomly select an ally
                         const targetAlly = validDecoyAllies[Math.floor(Math.random() * validDecoyAllies.length)];
-
-                        // Execute Swap
+                        // Perform Swap Logic (Programmatic)
                         const allyPos = this.getPiecePosition(targetAlly);
-                        this.board.setPiece(allyPos.row, allyPos.col, capturedPiece); // King moves to Ally pos
-                        this.board.setPiece(moveData.to.row, moveData.to.col, targetAlly); // Ally moves to King pos (to be captured)
 
-                        // Update Coords (handled by setPiece but good to be explicit/safe or if setPiece doesn't update internal props fully if not movePiece)
-                        // setPiece helper updates row/col of the piece object.
+                        // 1. King Reappears at Ally Pos
+                        this.board.setPiece(allyPos.row, allyPos.col, capturedPiece);
 
-                        // Consume Skill
+                        // 2. Consume Decoy Skill
                         capturedPiece.skills = capturedPiece.skills.filter(s => s.id !== 'decoy');
 
-                        logMsg += ` [影武者発動！(CPU) ${targetAlly.getName()}を身代わり]`;
+                        // 3. Log
+                        logMsg += ` [影武者発動！CPUが身代わり(${targetAlly.getName()})を選択]`;
+                        this.emit('log', logMsg, 'skill', colorClass, moveData);
 
-                        // Resume processing with the Ally as the captured piece
+                        // 4. Resume Processing (Recursive call with new 'capturedPiece' as the Ally)
+                        // Note: current logic flow in handleSquareClick calls completeMoveProcessing(piece, targetAlly, ...)
+                        // 'piece' is the attacker. 'targetAlly' takes the fall.
                         this.completeMoveProcessing(piece, targetAlly, logMsg, logType, colorClass, moveData, consumedRestriction);
                         return;
                     }
 
-                    // Human Handling: Selection Mode
+                    // Human Player (UI Selection)
+                    // 自動で選ばず、選択状態に入る
                     this.isSelectingDecoy = true;
                     this.decoyKing = capturedPiece; // 取られたキング（今は盤上にいない、あるいはcapturedPieceとして保持）
                     this.validDecoyAllies = validDecoyAllies;
