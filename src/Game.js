@@ -280,6 +280,17 @@ class Game extends EventEmitter {
             // Move the tyrant
             this.board.movePiece(fromRow, fromCol, destRow, destCol);
         }
+        else if (move.type === 'pierce_capture') {
+            // 攻撃貫通: 経路上の1体目(pierced)を撃破してから、2体目(着地先)へ移動して撃破
+            let piercedName = null;
+            if (move.pierced) {
+                const piercedPiece = this.board.getPiece(move.pierced.row, move.pierced.col);
+                piercedName = piercedPiece ? piercedPiece.getName() : null;
+                this.board.setPiece(move.pierced.row, move.pierced.col, null);
+            }
+            capturedPiece = this.board.movePiece(fromRow, fromCol, destRow, destCol);
+            move.piercedName = piercedName;
+        }
         else {
             // Normal / Capture Move
             capturedPiece = this.board.movePiece(fromRow, fromCol, destRow, destCol);
@@ -319,6 +330,12 @@ class Game extends EventEmitter {
                 // 粉砕した敵の名前を列挙
                 const crushedNames = move.crushed.map(c => c.piece.getName()).join(', ');
                 logMsg += ` (${crushedNames} を粉砕)`;
+            }
+        } else if (move.type === 'pierce_capture') {
+            logMsg += " [攻撃貫通]";
+            logType = 'skill';
+            if (move.piercedName) {
+                logMsg += ` (${move.piercedName} を貫通撃破)`;
             }
         }
 
