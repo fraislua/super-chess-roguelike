@@ -250,6 +250,15 @@ class AI {
             });
         }
 
+        // 攻撃貫通による1体目の撃破
+        if (move.type === 'pierce_capture' && move.pierced) {
+            const piercedPiece = board.getPiece(move.pierced.row, move.pierced.col);
+            if (piercedPiece) {
+                xpGained += (this.XP_GAINS[piercedPiece.type] || 50);
+            }
+            board.setPiece(move.pierced.row, move.pierced.col, null);
+        }
+
         // 移動XP (簡易)
         xpGained += 10;
 
@@ -281,12 +290,6 @@ class AI {
             }
         }
     }
-
-    // ... (getPieceValue, getPositionValue, getSkillSynergyValue, orderMoves, getAllMoves, getRandomMove, isGameOver, getSmartMove は変更なし) ...
-    // 省略していますが、以前のコードのまま残してください
-    static getPieceValue(piece) { /* ... */ return super_getPieceValue(piece); } // ※以前の実装
-    static getPositionValue(piece, r, c) { /* ... */ return super_getPositionValue(piece, r, c); } // ※以前の実装
-    static getSkillSynergyValue(piece, r, c) { /* ... */ return super_getSkillSynergyValue(piece, r, c); } // ※以前の実装
 
     // orderMoves は成長期待値も考慮してソートするように微調整すると尚良し
     static orderMoves(moves, board) {
@@ -357,7 +360,9 @@ class AI {
                 if (piece && piece.color === color) {
                     const validMoves = Rules.getValidMoves(board, piece, r, c, lastMove);
                     validMoves.forEach(m => {
-                        moves.push({ from: { row: r, col: c }, to: m, piece: piece, type: m.type, row: m.row, col: m.col, crushed: m.crushed });
+                        // ...m で crushed/pierced/pushBack など移動種別固有のフィールドを全て引き継ぐ
+                        // (取りこぼすと cross_switch の pushBack 等が欠落し、実行時に誤動作する)
+                        moves.push({ ...m, from: { row: r, col: c }, to: m, piece: piece });
                     });
                 }
             }

@@ -126,7 +126,8 @@ class Piece {
                             if (board.isValidPosition(pr, pc)) {
                                 const pTarget = board.getPiece(pr, pc);
                                 if (pTarget && pTarget.color !== this.color) {
-                                    moves.push({ row: pr, col: pc, type: 'pierce_capture', secondTarget: { row: pr, col: pc } });
+                                    // pierced: 貫通して撃破する1体目(手前の敵)の座標。着地先(2体目)は row/col。
+                                    moves.push({ row: pr, col: pc, type: 'pierce_capture', pierced: { row: r, col: c } });
                                 }
                             }
                         } else if (!hasTyrantsMarch) {
